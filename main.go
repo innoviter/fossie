@@ -293,6 +293,15 @@ func main() {
 				list-style: none;
 				padding: 0;
 				margin: 0;
+				display: grid;
+				grid-template-columns: 1fr;
+				gap: 1.5rem;
+			}
+			
+			@media (min-width: 640px) {
+				ul.app-list {
+					grid-template-columns: 1fr 1fr;
+				}
 			}
 			
 			ul.app-list li {
