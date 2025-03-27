@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -43,6 +44,19 @@ func loadLabels(locale string) (map[string]string, error) {
 		return nil, err
 	}
 	return labels, nil
+}
+
+func GenerateHandle(name string) string {
+	handle := strings.ReplaceAll(name, ".", "-")
+	handle = strings.ReplaceAll(handle, " ", "-")
+	handle = strings.ReplaceAll(handle, "_", "-")
+
+	re := regexp.MustCompile(`([a-z0-9])([A-Z])`)
+	handle = re.ReplaceAllString(handle, `${1}${2}`)
+
+	handle = strings.ToLower(handle)
+
+	return handle
 }
 
 func GetRepoHoster(repoURL string) string {
@@ -84,6 +98,7 @@ func main() {
 	defer db.Close()
 
 	r := gin.Default()
+	r.Static("/static", "./static")
 
 	r.GET("/", func(c *gin.Context) {
 		locale := c.DefaultQuery("lang", "en")
@@ -203,7 +218,157 @@ func main() {
 			sort.Slice(apps, func(i, j int) bool { return apps[i].Name < apps[j].Name })
 		}
 
-		html := `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>` + labels["title"] + `</title></head><body>`
+		html := `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>` + labels["title"] + `</title>
+		<style>
+			body {
+				font-family: system-ui, sans-serif;
+				margin: 2rem auto;
+				max-width: 800px;
+				line-height: 1.6;
+				padding: 0 1rem;
+				background: #f9fafb;
+				color: #111;
+			}
+			
+			h1 {
+				font-size: 1.8rem;
+				margin-bottom: 1.5rem;
+			}
+			
+			form {
+				background: #fff;
+				padding: 1rem;
+				border-radius: 8px;
+				margin-bottom: 2rem;
+				box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+			}
+			
+			form label {
+				display: block;
+				margin-top: 0.8rem;
+				font-weight: 600;
+			}
+			
+			form input[type="text"],
+			form select {
+				width: 100%;
+				padding: 0.5rem;
+				font-size: 1rem;
+				margin-top: 0.25rem;
+				border: 1px solid #ccc;
+				border-radius: 4px;
+			}
+			
+			form input[type="submit"] {
+				margin-top: 1rem;
+				background: #2563eb;
+				color: white;
+				padding: 0.6rem 1.2rem;
+				border: none;
+				border-radius: 4px;
+				cursor: pointer;
+			}
+			
+			form input[type="submit"]:hover {
+				background: #1d4ed8;
+			}
+			
+			.language-switch {
+				float: right;
+				font-size: 0.9rem;
+				margin-top: -2rem;
+			}
+			
+			.language-switch a {
+				color: #2563eb;
+				text-decoration: none;
+				margin: 0 0.25rem;
+			}
+			
+			.language-switch a:hover {
+				text-decoration: underline;
+			}
+			
+			ul.app-list {
+				list-style: none;
+				padding: 0;
+				margin: 0;
+			}
+			
+			ul.app-list li {
+				display: flex;
+				flex-direction: row;
+				align-items: flex-start;
+				gap: 1rem;
+				background: white;
+				margin-bottom: 1.5rem;
+				padding: 1rem 1.2rem;
+				border-radius: 12px;
+				box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+				transition: transform 0.2s ease;
+			}
+			
+			ul.app-list li:hover {
+				transform: translateY(-2px);
+			}
+			
+			ul.app-list li img {
+				width: 48px;
+				height: 48px;
+				border-radius: 8px;
+				flex-shrink: 0;
+			}
+			
+			.app-content {
+				flex: 1;
+			}
+			
+			.app-title {
+				font-size: 1.2rem;
+				margin: 0;
+				font-weight: 600;
+			}
+			
+			.app-title a {
+				text-decoration: none;
+				color: #111;
+			}
+			
+			.app-title a:hover {
+				text-decoration: underline;
+			}
+			
+			.meta {
+				font-size: 0.9rem;
+				color: #444;
+				margin-top: 0.2rem;
+			}
+			
+			.tags {
+				margin-top: 0.5rem;
+				font-size: 0.85rem;
+				color: #666;
+			}
+			
+			.tags strong {
+				color: #333;
+			}
+
+			span.tag {
+				display: inline-block;
+				background-color: #e0e7ff;
+				color: #3730a3;
+				font-size: 0.75rem;
+				padding: 0.2rem 0.5rem;
+				margin: 0.2rem 0.2rem 0 0;
+				border-radius: 999px;
+				font-weight: 500;
+				white-space: nowrap;
+			}
+		</style>
+
+		</head>
+		<body>`
 
 		html += `<div style="float:right;">
 		<a href="` + baseURL + `lang=en">English</a> |
@@ -245,14 +410,20 @@ func main() {
 		<input type="submit" value="` + labels["apply"] + `">
 		</form>`
 
-		html += fmt.Sprintf("<p><strong>%d "+labels["results"]+"</strong></p><ul>", len(apps))
+		html += fmt.Sprintf("<p><strong>%d "+labels["results"]+"</strong></p><ul class=\"app-list\">", len(apps))
 
 		for _, app := range apps {
 			html += "<li>"
-			html += "<strong>" + app.Name + "</strong><br/>"
+			html += "<img src=\"/static/icons/" + GenerateHandle(app.Name) + ".webp\" width=32 height=32 alt=\"" + GenerateHandle(app.Name) + "\">"
+			html += "<div class=\"app-content\">"
+			html += "<p class=\"app-title\">" + app.Name + "</p>"
 			html += "<p>" + app.Description + "</p>"
 			if len(app.Tags) > 0 {
-				html += "<p>Tags: <code>" + strings.Join(app.Tags, ", ") + "</code></p>"
+				html += "<div>Tags: "
+				for _, tag := range app.Tags {
+					html += "<span class=\"tag\">" + tag + "</span>"
+				}
+				html += "</div>"
 			}
 			html += "<p>"
 			html += labels["source"] + " <a href=\"" + app.SourceURL + "\">" + GetRepoHoster(app.SourceURL) + "</a>"
@@ -262,6 +433,7 @@ func main() {
 			last_activity := carbon.Parse(app.LastCommit)
 			html += labels["last_activity"] + " <span title=\"" + app.LastCommit + "\">" + last_activity.DiffForHumans() + "</span><br/>"
 			html += "</p>"
+			html += "</div>"
 			html += "</li>"
 		}
 		html += "</ul></body></html>"
