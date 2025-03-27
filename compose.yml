@@ -1,0 +1,17 @@
+services:
+  db:
+    image: postgres:17.4-alpine
+    container_name: fossie_db
+    restart: always
+    shm_size: 128mb
+    environment:
+      POSTGRES_DB: fossie
+      POSTGRES_USER: fossie
+      POSTGRES_PASSWORD: pass
+    ports:
+      - 5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
