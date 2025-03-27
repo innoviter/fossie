@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -20,21 +19,25 @@ import (
 )
 
 type App struct {
-	Name        string
-	Description string
-	SourceURL   string
-	License     string
-	Language    string
-	Tags        []string
-	Stars       int
-	CreatedAt   string
-	FirstCommit string
-	LastCommit  string
+	Name               string
+	Homepage           string
+	Maintainer         string
+	MaintainerHomepage string
+	CountryCode        string
+	Description        string
+	SourceURL          string
+	License            string
+	Language           string
+	Tags               []string
+	Stars              int
+	CreatedAt          string
+	FirstCommit        string
+	LastCommit         string
 }
 
-func loadLabels(locale string) (map[string]string, error) {
-	path := fmt.Sprintf("./i18n/%s.json", locale)
-	data, err := ioutil.ReadFile(path)
+func loadLabels(domain string, locale string) (map[string]string, error) {
+	path := fmt.Sprintf("./i18n/%s.%s.json", domain, locale)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -104,10 +107,16 @@ func main() {
 		locale := c.DefaultQuery("lang", "en")
 		carbon.SetLocale(locale)
 
-		labels, err := loadLabels(locale)
+		labels, err := loadLabels("labels", locale)
 		if err != nil {
 			log.Println("Could not load language file, falling back to English.", err)
-			labels, _ = loadLabels("en")
+			labels, _ = loadLabels("labels", "en")
+		}
+
+		countries, err := loadLabels("countries", locale)
+		if err != nil {
+			log.Println("Could not load countries file, falling back to English.", err)
+			labels, _ = loadLabels("countries", "en")
 		}
 
 		currentQuery := c.Request.URL.Query()
@@ -126,7 +135,7 @@ func main() {
 			tags = strings.Split(tagFilter, ",")
 		}
 
-		query := "SELECT id, name, description, source_url, license, language, stars, created_at, first_commit, last_commit FROM apps"
+		query := "SELECT id, name, homepage, maintainer, maintainer_homepage, country_code, description, source_url, license, language, stars, created_at, first_commit, last_commit FROM apps"
 		conditions := []string{}
 		args := []interface{}{}
 		argIdx := 1
@@ -177,7 +186,7 @@ func main() {
 		for rows.Next() {
 			var a App
 			var id string
-			if err := rows.Scan(&id, &a.Name, &a.Description, &a.SourceURL, &a.License, &a.Language, &a.Stars, &a.CreatedAt, &a.FirstCommit, &a.LastCommit); err != nil {
+			if err := rows.Scan(&id, &a.Name, &a.Homepage, &a.Maintainer, &a.MaintainerHomepage, &a.CountryCode, &a.Description, &a.SourceURL, &a.License, &a.Language, &a.Stars, &a.CreatedAt, &a.FirstCommit, &a.LastCommit); err != nil {
 				c.String(http.StatusInternalServerError, err.Error())
 				return
 			}
@@ -218,181 +227,196 @@ func main() {
 			sort.Slice(apps, func(i, j int) bool { return apps[i].Name < apps[j].Name })
 		}
 
-		html := `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>` + labels["title"] + `</title>
-		<style>
-			body {
-				font-family: system-ui, sans-serif;
-				margin: 2rem auto;
-				max-width: 800px;
-				line-height: 1.6;
-				padding: 0 1rem;
-				background: #f9fafb;
-				color: #111;
-			}
-			
-			h1 {
-				font-size: 1.8rem;
-				margin-bottom: 1.5rem;
-			}
-			
-			form {
-				background: #fff;
-				padding: 1rem;
-				border-radius: 8px;
-				margin-bottom: 2rem;
-				box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-			}
-			
-			form label {
-				display: block;
-				margin-top: 0.8rem;
-				font-weight: 600;
-			}
-			
-			form input[type="text"],
-			form select {
-				width: 100%;
-				padding: 0.5rem;
-				font-size: 1rem;
-				margin-top: 0.25rem;
-				border: 1px solid #ccc;
-				border-radius: 4px;
-			}
-			
-			form input[type="submit"] {
-				margin-top: 1rem;
-				background: #2563eb;
-				color: white;
-				padding: 0.6rem 1.2rem;
-				border: none;
-				border-radius: 4px;
-				cursor: pointer;
-			}
-			
-			form input[type="submit"]:hover {
-				background: #1d4ed8;
-			}
-			
-			.language-switch {
-				float: right;
-				font-size: 0.9rem;
-				margin-top: -2rem;
-			}
-			
-			.language-switch a {
-				color: #2563eb;
-				text-decoration: none;
-				margin: 0 0.25rem;
-			}
-			
-			.language-switch a:hover {
-				text-decoration: underline;
-			}
-			
-			ul.app-list {
-				list-style: none;
-				padding: 0;
-				margin: 0;
-				display: grid;
-				grid-template-columns: 1fr;
-				gap: 1.5rem;
-			}
-			
-			@media (min-width: 640px) {
-				ul.app-list {
-					grid-template-columns: 1fr 1fr;
-				}
-			}
-			
-			ul.app-list li {
-				display: flex;
-				flex-direction: row;
-				align-items: flex-start;
-				gap: 1rem;
-				background: white;
-				margin-bottom: 1.5rem;
-				padding: 1rem 1.2rem;
-				border-radius: 12px;
-				box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-				transition: transform 0.2s ease;
-			}
-			
-			ul.app-list li:hover {
-				transform: translateY(-2px);
-			}
-			
-			ul.app-list li img {
-				width: 48px;
-				height: 48px;
-				border-radius: 8px;
-				flex-shrink: 0;
-			}
-			
-			.app-content {
-				flex: 1;
-			}
-			
-			.app-title {
-				font-size: 1.2rem;
-				margin: 0;
-				font-weight: 600;
-			}
-			
-			.app-title a {
-				text-decoration: none;
-				color: #111;
-			}
-			
-			.app-title a:hover {
-				text-decoration: underline;
-			}
-			
-			.meta {
-				font-size: 0.9rem;
-				color: #444;
-				margin-top: 0.2rem;
-			}
-			
-			.tags {
-				margin-top: 0.5rem;
-				font-size: 0.85rem;
-				color: #666;
-			}
-			
-			.tags strong {
-				color: #333;
-			}
+		html := `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>` + labels["title"] + `</title>
+<style>
+	body {
+		font-family: system-ui, sans-serif;
+		margin: 2rem auto;
+		max-width: 800px;
+		line-height: 1.6;
+		padding: 0 1rem;
+		background: #f9fafb;
+		color: #111;
+	}
+	
+	h1 {
+		font-size: 1.8rem;
+		margin-bottom: 1.5rem;
+	}
+	
+	form {
+		background: #fff;
+		padding: 1rem;
+		border-radius: 8px;
+		margin-bottom: 2rem;
+		box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+	}
+	
+	form label {
+		display: block;
+		margin-top: 0.8rem;
+		font-weight: 600;
+	}
+	
+	form input[type="text"],
+	form select {
+		width: 100%;
+		padding: 0.5rem;
+		font-size: 1rem;
+		margin-top: 0.25rem;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+	}
+	
+	form input[type="submit"] {
+		margin-top: 1rem;
+		background: #2563eb;
+		color: white;
+		padding: 0.6rem 1.2rem;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+	}
+	
+	form input[type="submit"]:hover {
+		background: #1d4ed8;
+	}
 
-			span.tag {
-				display: inline-block;
-				background-color: #e0e7ff;
-				color: #3730a3;
-				font-size: 0.75rem;
-				padding: 0.2rem 0.5rem;
-				margin: 0.2rem 0.2rem 0 0;
-				border-radius: 999px;
-				font-weight: 500;
-				white-space: nowrap;
-			}
-		</style>
+	.logo {
+		height: 32px;
+		display: flex;
+		align-items: center;
+	}
 
-		</head>
-		<body>`
+	.language-switch {
+		height: 32px;
+		float: right;
+		align-items: center;
+		padding-top: 0.25rem;
+	}
+	
+	.language-switch a {
+		color: #2563eb;
+		text-decoration: none;
+		margin: 0 0.25rem;
+	}
+	
+	.language-switch a:hover {
+		text-decoration: underline;
+	}
+	
+	ul.app-list {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1.5rem;
+	}
+	
+	@media (min-width: 640px) {
+		ul.app-list {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+	
+	ul.app-list li {
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		gap: 1rem;
+		background: white;
+		margin-bottom: 1.5rem;
+		padding: 1rem 1.2rem;
+		border-radius: 12px;
+		box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+		transition: transform 0.2s ease;
+	}
+	
+	ul.app-list li:hover {
+		transform: translateY(-2px);
+	}
+	
+	ul.app-list li img {
+		width: 48px;
+		height: 48px;
+		border-radius: 8px;
+		flex-shrink: 0;
+	}
+	
+	.app-content {
+		flex: 1;
+	}
+	
+	.app-title {
+		font-size: 1.2rem;
+		margin: 0;
+		font-weight: 600;
+	}
+	
+	.app-title a {
+		text-decoration: none;
+		color: #111;
+	}
+	
+	.app-title a:hover {
+		text-decoration: underline;
+	}
+	
+	.meta {
+		font-size: 0.9rem;
+		color: #444;
+		margin-top: 0.2rem;
+	}
+	
+	.tags {
+		margin-top: 0.5rem;
+		font-size: 0.85rem;
+		color: #666;
+	}
+	
+	.tags strong {
+		color: #333;
+	}
 
-		html += `<div style="float:right;">
-		<a href="` + baseURL + `lang=en">English</a> |
-		<a href="` + baseURL + `lang=de">Deutsch</a> |
-		<a href="` + baseURL + `lang=fr">Français</a>
-		</div>`
+	span.tag {
+		display: inline-block;
+		background-color: #e0e7ff;
+		color: #3730a3;
+		font-size: 0.75rem;
+		padding: 0.2rem 0.5rem;
+		margin: 0.2rem 0.2rem 0 0;
+		border-radius: 999px;
+		font-weight: 500;
+		white-space: nowrap;
+	}
+</style>
 
-		html += `<h1>` + labels["title"] + `</h1>
-		<form method="get">
-		<label for="q">` + labels["search"] + `</label>
-		<input type="text" name="q" placeholder="` + labels["search_placeholder"] + `" value="` + keyword + `">
-		<label for="tags">` + labels["filter_tags"] + `</label>
-		<input type="text" name="tags" placeholder="` + labels["filter_tags_placeholder"] + `" value="` + tagFilter + `">
-		<label for="sort">` + labels["sort_by"] + `</label>
-		<select name="sort" onchange="this.form.submit()">`
+</head>
+<body>
+		
+<div class="language-switch">
+<a href="` + baseURL + `lang=en">English</a> |
+<a href="` + baseURL + `lang=de">Deutsch</a> |
+<a href="` + baseURL + `lang=fr">Français</a>
+</div>
+
+<div class="logo">
+<img src="/static/logo_512.png" width=32 height=32 alt="FOSSIE">
+<span style="padding-left: 0.5rem;"><strong>FOSSIE</strong></span>
+</div>
+<h1>` + labels["title"] + `</h1>
+<form method="get">
+<label for="q">` + labels["search"] + `</label>
+<input type="text" name="q" placeholder="` + labels["search_placeholder"] + `" value="` + keyword + `">
+<label for="tags">` + labels["filter_tags"] + `</label>
+<input type="text" name="tags" placeholder="` + labels["filter_tags_placeholder"] + `" value="` + tagFilter + `">
+<label for="sort">` + labels["sort_by"] + `</label>
+<select name="sort" onchange="this.form.submit()">`
 
 		sortOptions := []struct {
 			Value string
@@ -415,20 +439,21 @@ func main() {
 		}
 
 		html += `</select>
-		<input type="hidden" name="lang" value="` + locale + `">
-		<input type="submit" value="` + labels["apply"] + `">
-		</form>`
+<input type="hidden" name="lang" value="` + locale + `">
+<input type="submit" value="` + labels["apply"] + `">
+</form>`
 
 		html += fmt.Sprintf("<p><strong>%d "+labels["results"]+"</strong></p><ul class=\"app-list\">", len(apps))
 
 		for _, app := range apps {
-			html += "<li>"
-			html += "<img src=\"/static/icons/" + GenerateHandle(app.Name) + ".webp\" width=32 height=32 alt=\"" + GenerateHandle(app.Name) + "\">"
-			html += "<div class=\"app-content\">"
-			html += "<p class=\"app-title\">" + app.Name + "</p>"
-			html += "<p>" + app.Description + "</p>"
+			html += `<li>
+<a href="` + app.Homepage + `"><img src="/static/icons/` + GenerateHandle(app.Name) + `.webp" width=32 height=32 alt="` + GenerateHandle(app.Name) + `"></a>
+<div class="app-content">
+<p class="app-title"><a href="` + app.Homepage + `">` + app.Name + `</a></p>
+<p><a href="` + app.MaintainerHomepage + `">` + app.Maintainer + `</a>, ` + countries[app.CountryCode] + `</p>
+<p>` + app.Description + `</p>`
 			if len(app.Tags) > 0 {
-				html += "<div>Tags: "
+				html += "<div>"
 				for _, tag := range app.Tags {
 					html += "<span class=\"tag\">" + tag + "</span>"
 				}
@@ -439,8 +464,8 @@ func main() {
 			html += " ⭐ " + itoa(app.Stars) + "<br/>"
 			html += labels["license"] + " " + app.License + "<br/>"
 			html += labels["language"] + " " + app.Language + "<br/>"
-			last_activity := carbon.Parse(app.LastCommit)
-			html += labels["last_activity"] + " <span title=\"" + app.LastCommit + "\">" + last_activity.DiffForHumans() + "</span><br/>"
+			lastActivity := carbon.Parse(app.LastCommit)
+			html += labels["last_activity"] + " <span title=\"" + app.LastCommit + "\">" + lastActivity.DiffForHumans() + "</span><br/>"
 			html += "</p>"
 			html += "</div>"
 			html += "</li>"
