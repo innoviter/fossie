@@ -1,0 +1,21 @@
+{
+  "title": "Index für freie und Open-Source-Software für Europa und andere Länder (FOSSIE)",
+  "search": "Suche:",
+  "search_placeholder": "z. B. German cloud",
+  "filter_tags": "Filter nach Tags:",
+  "filter_tags_placeholder": "z. B. cloud,filesharing",
+  "sort_by": "Sortieren nach:",
+  "apply": "Anwenden",
+  "results": "Ergebnis(se)",
+  "sort_alphabetical": "Alphabetisch",
+  "sort_stars": "Sterne",
+  "sort_activity": "Letzte Aktivität",
+  "sort_recently_added": "Zuletzt hinzugefügt",
+  "sort_age_asc": "Alter (aufsteigend)",
+  "sort_age_desc": "Alter (absteigend)",
+  "last_activity": "Letzte Aktivität:",
+  "tags": "Tags:",
+  "source": "Quellcode:",
+  "language": "Sprache:",
+  "license": "License:"
+}

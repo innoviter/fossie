@@ -1,0 +1,21 @@
+{
+  "title": "Free and Open Source Software Index for Europe and other (FOSSIE)",
+  "search": "Search:",
+  "search_placeholder": "e. g. British cloud",
+  "filter_tags": "Filter by tags:",
+  "filter_tags_placeholder": "e. g. cloud,filesharing",
+  "sort_by": "Sort by:",
+  "apply": "Apply",
+  "results": "result(s)",
+  "sort_alphabetical": "Alphabetical",
+  "sort_stars": "Stars",
+  "sort_activity": "Last Activity",
+  "sort_recently_added": "Recently Added",
+  "sort_age_asc": "Age (Ascending)",
+  "sort_age_desc": "Age (Descending)",
+  "last_activity": "Last activity:",
+  "tags": "Tags:",
+  "source": "Source:",
+  "language": "Language:",
+  "license": "Lizenz:"
+}

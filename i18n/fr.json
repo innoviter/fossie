@@ -1,0 +1,21 @@
+{
+  "title": "Index des logiciels libres et open source pour l'Europe et d'autres pays (FOSSIE)",
+  "search": "Recherche:",
+  "search_placeholder": "par ex. French cloud",
+  "filter_tags": "Filtrer par tags:",
+  "filter_tags_placeholder": "par ex. cloud,filesharing",
+  "sort_by": "Trier par:",
+  "apply": "Appliquer",
+  "results": "résultat(s)",
+  "sort_alphabetical": "Alphabétique",
+  "sort_stars": "Étoiles",
+  "sort_activity": "Dernière activité",
+  "sort_recently_added": "Ajout récent",
+  "sort_age_asc": "Ancienneté (croissante)",
+  "sort_age_desc": "Ancienneté (décroissante)",
+  "last_activity": "Dernière activité:",
+  "tags": "Tags:",
+  "source": "Code source:",
+  "language": "Langue:",
+  "license": "Licence:"
+}

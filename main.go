@@ -2,13 +2,17 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
 
+	"github.com/dromara/carbon/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -25,6 +29,41 @@ type App struct {
 	CreatedAt   string
 	FirstCommit string
 	LastCommit  string
+}
+
+func loadLabels(locale string) (map[string]string, error) {
+	path := fmt.Sprintf("./i18n/%s.json", locale)
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var labels map[string]string
+	err = json.Unmarshal(data, &labels)
+	if err != nil {
+		return nil, err
+	}
+	return labels, nil
+}
+
+func GetRepoHoster(repoURL string) string {
+	u, err := url.Parse(repoURL)
+	if err != nil {
+		return "Unknown"
+	}
+
+	host := u.Host
+	switch {
+	case strings.Contains(host, "github.com"):
+		return "GitHub"
+	case strings.Contains(host, "gitlab.com"):
+		return "GitLab"
+	case strings.Contains(host, "codeberg.org"):
+		return "Codeberg"
+	case strings.Contains(host, "sr.ht"):
+		return "SourceHut"
+	default:
+		return "Unknown"
+	}
 }
 
 func main() {
@@ -47,6 +86,22 @@ func main() {
 	r := gin.Default()
 
 	r.GET("/", func(c *gin.Context) {
+		locale := c.DefaultQuery("lang", "en")
+		carbon.SetLocale(locale)
+
+		labels, err := loadLabels(locale)
+		if err != nil {
+			log.Println("Could not load language file, falling back to English.", err)
+			labels, _ = loadLabels("en")
+		}
+
+		currentQuery := c.Request.URL.Query()
+		currentQuery.Del("lang")
+		baseURL := c.Request.URL.Path + "?" + currentQuery.Encode()
+		if currentQuery.Encode() != "" {
+			baseURL += "&"
+		}
+
 		sortParam := c.Query("sort")
 		tagFilter := c.Query("tags")
 		keyword := c.Query("q")
@@ -148,26 +203,33 @@ func main() {
 			sort.Slice(apps, func(i, j int) bool { return apps[i].Name < apps[j].Name })
 		}
 
-		html := "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>FOSSIE – Open Source Software Index Europe</title></head><body>"
-		html += `<h1>Open Source Software Index Europe (FOSSIE)</h1>
+		html := `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>` + labels["title"] + `</title></head><body>`
+
+		html += `<div style="float:right;">
+		<a href="` + baseURL + `lang=en">English</a> |
+		<a href="` + baseURL + `lang=de">Deutsch</a> |
+		<a href="` + baseURL + `lang=fr">Français</a>
+		</div>`
+
+		html += `<h1>` + labels["title"] + `</h1>
 		<form method="get">
-		<label for="q">Search:</label>
-		<input type="text" name="q" placeholder="e.g. Germany cloud" value="` + keyword + `">
-		<label for="tags">Filter by tags:</label>
-		<input type="text" name="tags" placeholder="e.g. cloud,filesharing" value="` + tagFilter + `">
-		<label for="sort">Sort by:</label>
+		<label for="q">` + labels["search"] + `</label>
+		<input type="text" name="q" placeholder="` + labels["search_placeholder"] + `" value="` + keyword + `">
+		<label for="tags">` + labels["filter_tags"] + `</label>
+		<input type="text" name="tags" placeholder="` + labels["filter_tags_placeholder"] + `" value="` + tagFilter + `">
+		<label for="sort">` + labels["sort_by"] + `</label>
 		<select name="sort" onchange="this.form.submit()">`
 
 		sortOptions := []struct {
 			Value string
 			Label string
 		}{
-			{"alphabetical", "Alphabetical"},
-			{"stars", "Stars"},
-			{"activity", "Last Activity"},
-			{"recently_added", "Recently Added"},
-			{"age_asc", "Age (Ascending)"},
-			{"age_desc", "Age (Descending)"},
+			{"alphabetical", labels["sort_alphabetical"]},
+			{"stars", labels["sort_stars"]},
+			{"activity", labels["sort_activity"]},
+			{"recently_added", labels["sort_recently_added"]},
+			{"age_asc", labels["sort_age_asc"]},
+			{"age_desc", labels["sort_age_desc"]},
 		}
 
 		for _, opt := range sortOptions {
@@ -179,19 +241,27 @@ func main() {
 		}
 
 		html += `</select>
-		<input type="submit" value="Apply">
+		<input type="hidden" name="lang" value="` + locale + `">
+		<input type="submit" value="` + labels["apply"] + `">
 		</form>`
 
-		html += fmt.Sprintf("<p><strong>%d result(s)</strong></p><ul>", len(apps))
+		html += fmt.Sprintf("<p><strong>%d "+labels["results"]+"</strong></p><ul>", len(apps))
 
 		for _, app := range apps {
-			html += "<li><strong>" + app.Name + "</strong><br>"
-			html += "<em>" + app.Language + "</em> – " + app.License + " – ⭐ " + itoa(app.Stars) + "<br>"
-			html += "<a href=\"" + app.SourceURL + "\">Source</a><br>"
+			html += "<li>"
+			html += "<strong>" + app.Name + "</strong><br/>"
 			html += "<p>" + app.Description + "</p>"
 			if len(app.Tags) > 0 {
-				html += "<p><strong>Tags:</strong> " + strings.Join(app.Tags, ", ") + "</p>"
+				html += "<p>Tags: <code>" + strings.Join(app.Tags, ", ") + "</code></p>"
 			}
+			html += "<p>"
+			html += labels["source"] + " <a href=\"" + app.SourceURL + "\">" + GetRepoHoster(app.SourceURL) + "</a>"
+			html += " ⭐ " + itoa(app.Stars) + "<br/>"
+			html += labels["license"] + " " + app.License + "<br/>"
+			html += labels["language"] + " " + app.Language + "<br/>"
+			last_activity := carbon.Parse(app.LastCommit)
+			html += labels["last_activity"] + " <span title=\"" + app.LastCommit + "\">" + last_activity.DiffForHumans() + "</span><br/>"
+			html += "</p>"
 			html += "</li>"
 		}
 		html += "</ul></body></html>"
